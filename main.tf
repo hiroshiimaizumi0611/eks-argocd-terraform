@@ -17,10 +17,11 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "20.8.4"
 
-  cluster_name    = var.cluster_name
-  cluster_version = "1.29"
-  subnet_ids      = module.vpc.private_subnets
-  vpc_id          = module.vpc.vpc_id
+  cluster_name                   = var.cluster_name
+  cluster_version                = "1.29"
+  cluster_endpoint_public_access = true
+  subnet_ids                     = module.vpc.private_subnets
+  vpc_id                         = module.vpc.vpc_id
 
   eks_managed_node_groups = {
     default = {
@@ -40,7 +41,7 @@ resource "null_resource" "kubeconfig" {
   }
 
   provisioner "local-exec" {
-    command = "aws eks update-kubeconfig --region ${var.region} -name ${module.eks.cluster_name}"
+    command = "aws eks update-kubeconfig --region ${var.region} --name ${module.eks.cluster_name}"
   }
 }
 
