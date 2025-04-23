@@ -32,3 +32,29 @@ module "eks" {
     }
   }
 }
+
+resource "null_resource" "kubeconfig" {
+  triggers = {
+    cluster_name = module.eks.cluster_name
+    region       = var.region
+  }
+
+  provisioner "local-exec" {
+    command = "aws eks update-kubeconfig --region ${var.region} -name ${module.eks.cluster_name}"
+  }
+}
+
+resource "helm_release" "argocd" {
+  name       = "argocd"
+  namespace  = kubernetes_namespace.argocd.metadata[0].name
+  chart      = "argo-cd"
+  repository = "https://argoproj.github.io/argo-helm"
+  version    = "5.46.4"
+
+  set {
+    name  = "server.service.type"
+    value = "LoadBalancer"
+  }
+
+  depends_on = [null_resource.kubeconfig]
+}
