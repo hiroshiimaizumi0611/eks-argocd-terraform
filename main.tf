@@ -44,6 +44,12 @@ resource "null_resource" "kubeconfig" {
   }
 }
 
+resource "kubernetes_namespace" "argocd" {
+  metadata {
+    name = "argocd"
+  }
+}
+
 resource "helm_release" "argocd" {
   name       = "argocd"
   namespace  = kubernetes_namespace.argocd.metadata[0].name
