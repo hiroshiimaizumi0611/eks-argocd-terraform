@@ -29,7 +29,7 @@ module "eks" {
       max_size     = 3
       min_size     = 1
 
-      instance_types = ["t3.micro"]
+      instance_types = ["t3.medium"]
     }
   }
 }
@@ -52,16 +52,15 @@ resource "kubernetes_namespace" "argocd" {
 }
 
 resource "helm_release" "argocd" {
-  name       = "argocd"
-  namespace  = kubernetes_namespace.argocd.metadata[0].name
-  chart      = "argo-cd"
-  repository = "https://argoproj.github.io/argo-helm"
-  version    = "5.46.4"
+  name      = "argocd"
+  namespace = "argocd"
+  chart     = "./argo-cd"
+  version   = "5.46.4"
 
   set {
     name  = "server.service.type"
     value = "LoadBalancer"
   }
 
-  depends_on = [null_resource.kubeconfig]
+  depends_on = [null_resource.kubeconfig, kubernetes_namespace.argocd]
 }
