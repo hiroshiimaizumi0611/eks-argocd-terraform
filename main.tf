@@ -5,12 +5,27 @@ module "vpc" {
   name = "eks-vpc"
   cidr = var.vpc_cidr
 
-  azs             = ["ap-northeast-1a", "ap-northeast-1c"]
-  private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
-  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
+  azs = ["ap-northeast-1a", "ap-northeast-1c"]
+  public_subnets = [
+    "10.0.11.0/24", # public-firewall-a
+    "10.0.21.0/24", # public-alb-a
+    "10.0.12.0/24", # public-firewall-c
+    "10.0.22.0/24", # public-alb-c
+  ]
 
-  enable_nat_gateway = true
-  single_nat_gateway = true
+  private_subnets = [
+    "10.0.31.0/24", # private-eks-a
+    "10.0.32.0/24", # private-eks-c
+  ]
+
+  enable_nat_gateway   = true
+  single_nat_gateway   = true
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
+  tags = {
+    Project = "eks-refactor"
+  }
 }
 
 module "eks" {
@@ -57,9 +72,34 @@ resource "helm_release" "argocd" {
   chart     = "./argo-cd"
   version   = "5.46.4"
 
+  # Ingressを有効化
+  set {
+    name  = "server.ingress.enabled"
+    value = "true"
+  }
+
+  # ALB用のIngress Class
+  set {
+    name  = "server.ingress.ingressClassName"
+    value = "alb"
+  }
+
+  # ALBをパブリックで作成
+  set {
+    name  = "server.ingress.annotations.alb\\.ingress\\.kubernetes\\.io/scheme"
+    value = "internet-facing"
+  }
+
+  # ALBのターゲットを Pod IP に
+  set {
+    name  = "server.ingress.annotations.alb\\.ingress\\.kubernetes\\.io/target-type"
+    value = "ip"
+  }
+
+  # Serviceは ClusterIP にしておく（ALB経由でアクセスするため）
   set {
     name  = "server.service.type"
-    value = "LoadBalancer"
+    value = "ClusterIP"
   }
 
   depends_on = [null_resource.kubeconfig, kubernetes_namespace.argocd]
