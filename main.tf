@@ -7,16 +7,21 @@ module "vpc" {
 
   azs = ["ap-northeast-1a", "ap-northeast-1c"]
   public_subnets = [
-    "10.0.11.0/24", # public-firewall-a
+    # "10.0.11.0/24", # public-firewall-a
     "10.0.21.0/24", # public-alb-a
-    "10.0.12.0/24", # public-firewall-c
+    # "10.0.12.0/24", # public-firewall-c
     "10.0.22.0/24", # public-alb-c
   ]
+
 
   private_subnets = [
     "10.0.31.0/24", # private-eks-a
     "10.0.32.0/24", # private-eks-c
   ]
+
+  public_subnet_tags = {
+    "kubernetes.io/role/elb" = "1"
+  }
 
   enable_nat_gateway   = true
   single_nat_gateway   = true
@@ -102,17 +107,49 @@ resource "helm_release" "argocd" {
     value = "ClusterIP"
   }
 
+  # Ingressのホスト制限を削除
+  set {
+    name  = "server.ingress.hosts[0]"
+    value = ""
+  }
+
+  # HTTPS を無効化
+  set {
+    name  = "server.ingress.https"
+    value = "false"
+  }
+
+  # TLS を完全に無効化（念のため）
+  set {
+    name  = "server.ingress.tls.enabled"
+    value = "false"
+  }
+  set {
+    name  = "server.ingress.tls.secretName"
+    value = ""
+  }
+
+  set {
+    name  = "server.insecure"
+    value = "true"
+  }
+
+  set {
+    name  = "server.service.servicePortHttp"
+    value = "80"
+  }
+
   depends_on = [null_resource.kubeconfig, kubernetes_namespace.argocd]
 }
 
 # ① OIDC Provider
-data "aws_eks_cluster" "this" {
-  name = module.eks.cluster_name
-}
+# data "aws_eks_cluster" "this" {
+#   name = module.eks.cluster_name
+# }
 
-data "aws_eks_cluster_auth" "this" {
-  name = module.eks.cluster_name
-}
+# data "aws_eks_cluster_auth" "this" {
+#   name = module.eks.cluster_name
+# }
 
 data "aws_iam_policy_document" "oidc_assume_role" {
   statement {
@@ -177,6 +214,11 @@ resource "helm_release" "alb_controller" {
   set {
     name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
     value = aws_iam_role.alb_controller.arn
+  }
+
+  set {
+    name  = "server.service.servicePortHttp"
+    value = "80"
   }
 
   depends_on = [
